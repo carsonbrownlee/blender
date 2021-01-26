@@ -22,6 +22,11 @@
 #  include <nanovdb/NanoVDB.h>
 #  include <nanovdb/util/SampleFromVoxels.h>
 #endif
+#ifdef WITH_OPENVKL
+#   include <openvkl/openvkl.h>
+#endif
+
+#include <iostream> //Carson: remove
 
 CCL_NAMESPACE_BEGIN
 
@@ -582,6 +587,37 @@ template<typename T> struct NanoVDBInterpolator {
 };
 #endif
 
+
+#ifdef WITH_OPENVKL
+template<typename T> struct OpenVKLInterpolator {
+
+  static ccl_always_inline float4 read(float r)
+  {
+    return make_float4(r, r, r, 1.0f);
+  }
+
+  static ccl_always_inline float4
+  interp_3d(const TextureInfo &info, float x, float y, float z, InterpolationType interp)
+  {
+    //std::cout << "openvklInterpolator::interp3d\n";
+    //std::cout << *((int*)info.data) << std::endl;
+
+    //return read(0.01f);
+    const VKLSampler sampler = info.vkl_sampler;
+    //Carson: where and how to grab correct range?  This should probably be done in imagevdb
+    vkl_vec3f min = {-300.f,-47.f,-208.f};
+    vkl_vec3f max = {276.f,524.f,229.f};
+    vkl_vec3f range = {max.x-min.x,max.y-min.y,max.z-min.z};
+    //const vkl_vec3f coord = {x*range.x-0.5f, y*range.y-0.5f, z*range.z-0.5f};
+    const vkl_vec3f coord = {x, y, z};
+    //Carson: check coordinates
+    // std::cout << coord.x << std::endl;
+    const auto sample = vklComputeSample(sampler, &coord, 0);
+    return read(sample/128.f /*TODO: FIXME: sampling weight*/);
+  }
+};
+#endif
+
 #undef SET_CUBIC_SPLINE_WEIGHTS
 
 ccl_device float4 kernel_tex_image_interp(KernelGlobals *kg, int id, float x, float y)
@@ -640,6 +676,10 @@ ccl_device float4 kernel_tex_image_interp_3d(KernelGlobals *kg,
       return TextureInterpolator<ushort4>::interp_3d(info, P.x, P.y, P.z, interp);
     case IMAGE_DATA_TYPE_FLOAT4:
       return TextureInterpolator<float4>::interp_3d(info, P.x, P.y, P.z, interp);
+#ifdef WITH_OPENVKL
+    case IMAGE_DATA_TYPE_OPENVKL_FLOAT:
+      return OpenVKLInterpolator<float>::interp_3d(info, P.x, P.y, P.z, interp);
+#endif
 #ifdef WITH_NANOVDB
     case IMAGE_DATA_TYPE_NANOVDB_FLOAT:
       return NanoVDBInterpolator<float>::interp_3d(info, P.x, P.y, P.z, interp);

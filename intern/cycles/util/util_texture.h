@@ -19,6 +19,10 @@
 
 #include "util_transform.h"
 
+#ifdef WITH_OPENVKL
+#   include <openvkl/openvkl.h>
+#endif
+
 CCL_NAMESPACE_BEGIN
 
 /* Texture limits on devices. */
@@ -59,6 +63,8 @@ typedef enum ImageDataType {
   IMAGE_DATA_TYPE_USHORT = 7,
   IMAGE_DATA_TYPE_NANOVDB_FLOAT = 8,
   IMAGE_DATA_TYPE_NANOVDB_FLOAT3 = 9,
+  IMAGE_DATA_TYPE_OPENVKL_FLOAT = 10,
+  IMAGE_DATA_TYPE_OPENVKL_FLOAT3 = 11,
 
   IMAGE_DATA_NUM_TYPES
 } ImageDataType;
@@ -106,6 +112,9 @@ typedef struct TextureInfo {
   /* Transform for 3D textures. */
   uint use_transform_3d;
   Transform transform_3d;
+  #if WITH_OPENVKL
+    VKLSampler vkl_sampler;
+  #endif
 } TextureInfo;
 
 CCL_NAMESPACE_END

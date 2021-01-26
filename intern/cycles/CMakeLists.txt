@@ -278,6 +278,18 @@ if(WITH_NANOVDB)
   )
 endif()
 
+if(WITH_OPENVKL)
+  add_definitions(-DWITH_OPENVKL)
+  find_package(openvkl 0.11.0 REQUIRED CONFIG)
+  get_target_property(OPENVKL_INCLUDE_DIRS openvkl::openvkl INTERFACE_INCLUDE_DIRECTORIES)
+  get_target_property(OPENVKL_LIBRARIES openvkl::openvkl LINK_LIBRARIES)
+  message("openvkl libraries:" ${OPENVKL_LIBRARIES})
+  include_directories(
+   SYSTEM
+   ${OPENVKL_INCLUDE_DIRS}
+  )
+endif()
+
 if(WITH_OPENSUBDIV)
   add_definitions(-DWITH_OPENSUBDIV)
   include_directories(

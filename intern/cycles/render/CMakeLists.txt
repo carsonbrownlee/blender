@@ -150,6 +150,12 @@ if(WITH_NANOVDB)
   )
 endif()
 
+if(WITH_OPENVKL)
+  list(APPEND LIB
+    openvkl::openvkl
+  )
+endif()
+
 include_directories(${INC})
 include_directories(SYSTEM ${INC_SYS})
 

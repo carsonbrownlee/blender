@@ -28,6 +28,12 @@ CCL_NAMESPACE_BEGIN
 
 VDBImageLoader::VDBImageLoader(const string &grid_name) : grid_name(grid_name)
 {
+  std::cout << "VDBImageLoader::VDBImageLoader\n";
+  vklLoadModule("ispc_driver");
+
+  VKLDriver driver = vklNewDriver("ispc");
+  vklCommitDriver(driver);
+  vklSetCurrentDriver(driver);
 }
 
 VDBImageLoader::~VDBImageLoader()
@@ -55,6 +61,13 @@ bool VDBImageLoader::load_metadata(ImageMetaData &metadata)
   /* Set data type. */
   if (grid->isType<openvdb::FloatGrid>()) {
     metadata.channels = 1;
+#  ifdef WITH_OPENVKL
+    //TODO: vkl should take const ptrs...
+    vklgrid = openvdb::gridPtrCast<openvdb::FloatGrid>(*(openvdb::FloatGrid::Ptr*)&grid /*TODO: FIX ME*/);
+    vklOpenVdbFloatGrid.reset(new openvkl::vdb_util::OpenVdbFloatGrid(vklgrid));
+    vklVolumeVdb = vklOpenVdbFloatGrid->createVolume(VKL_FILTER_TRILINEAR);
+    vklSampler = vklNewSampler(vklVolumeVdb);
+#  endif
 #  ifdef WITH_NANOVDB
     nanogrid = nanovdb::openToNanoVDB(*openvdb::gridConstPtrCast<openvdb::FloatGrid>(grid));
 #  endif
@@ -117,7 +130,15 @@ bool VDBImageLoader::load_metadata(ImageMetaData &metadata)
     return false;
   }
 
-#  ifdef WITH_NANOVDB
+#  ifdef WITH_OPENVKL
+  metadata.byte_size = sizeof(void*);
+  if (metadata.channels == 1) {
+    metadata.type = IMAGE_DATA_TYPE_OPENVKL_FLOAT;
+  }
+  else {
+    metadata.type = IMAGE_DATA_TYPE_OPENVKL_FLOAT3;
+  }
+#  elif WITH_NANOVDB
   metadata.byte_size = nanogrid.size();
   if (metadata.channels == 1) {
     metadata.type = IMAGE_DATA_TYPE_NANOVDB_FLOAT;
@@ -151,8 +172,20 @@ bool VDBImageLoader::load_metadata(ImageMetaData &metadata)
                                transform_scale(dim.x(), dim.y(), dim.z());
 #  endif
 
+#  ifdef WITH_OPENVKL
+  //TODO: OpenVKL expects coords to be in range 0 - dimension, how to transform into range?
+  // std::cout << " bbox.min: " << bbox.min() << std::endl;
+  // std::cout << " bbox.max: " << bbox.max() << std::endl;
+  openvdb::Coord min = bbox.min();
+  texture_to_index = transform_translate(min.x(), min.y(), min.z()) *
+                               transform_scale(dim.x(), dim.y(), dim.z());
+  // texture_to_index = transform_identity();
+#endif
   metadata.transform_3d = transform_inverse(index_to_object * texture_to_index);
   metadata.use_transform_3d = true;
+#  ifdef WITH_OPENVKL
+  //metadata.use_transform_3d = false;
+#endif
 
   return true;
 #else
@@ -164,7 +197,11 @@ bool VDBImageLoader::load_metadata(ImageMetaData &metadata)
 bool VDBImageLoader::load_pixels(const ImageMetaData &, void *pixels, const size_t, const bool)
 {
 #ifdef WITH_OPENVDB
-#  ifdef WITH_NANOVDB
+#  ifdef WITH_OPENVKL
+  //int test = 414;
+  //memcpy(pixels, &test, sizeof(int));
+  memcpy(pixels, &vklSampler, sizeof(void*));
+#  elif WITH_NANOVDB
   memcpy(pixels, nanogrid.data(), nanogrid.size());
 #  else
   if (grid->isType<openvdb::FloatGrid>()) {
@@ -238,6 +275,10 @@ void VDBImageLoader::cleanup()
 #endif
 #ifdef WITH_NANOVDB
   nanogrid.reset();
+#endif
+#ifdef WITH_OPENVKL
+  vklOpenVdbFloatGrid.reset();
+  vklRelease(vklVolumeVdb);
 #endif
 }
 

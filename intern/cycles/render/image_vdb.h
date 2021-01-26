@@ -23,6 +23,10 @@
 #ifdef WITH_NANOVDB
 #  include <nanovdb/util/GridHandle.h>
 #endif
+#ifdef WITH_OPENVKL
+#   include <openvkl/openvkl.h>
+#   include <openvkl/vdb_util/OpenVdbGrid.h>
+#endif
 
 #include "render/image.h"
 
@@ -51,6 +55,9 @@ class VDBImageLoader : public ImageLoader {
 #ifdef WITH_OPENVDB
   openvdb::GridBase::ConstPtr get_grid();
 #endif
+#ifdef WITH_OPENVKL
+  VKLSampler getVKLSampler() { return vklSampler; }
+#endif
 
  protected:
   string grid_name;
@@ -60,6 +67,12 @@ class VDBImageLoader : public ImageLoader {
 #endif
 #ifdef WITH_NANOVDB
   nanovdb::GridHandle<> nanogrid;
+#endif
+#ifdef WITH_OPENVKL
+  openvdb::FloatGrid::Ptr vklgrid;
+  std::unique_ptr<openvkl::vdb_util::OpenVdbFloatGrid> vklOpenVdbFloatGrid;
+  VKLVolume vklVolumeVdb{nullptr};
+  VKLSampler vklSampler{nullptr};
 #endif
 };
 
