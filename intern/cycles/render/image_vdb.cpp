@@ -66,7 +66,9 @@ bool VDBImageLoader::load_metadata(ImageMetaData &metadata)
     vklgrid = openvdb::gridPtrCast<openvdb::FloatGrid>(*(openvdb::FloatGrid::Ptr*)&grid /*TODO: FIX ME*/);
     vklOpenVdbFloatGrid.reset(new openvkl::vdb_util::OpenVdbFloatGrid(vklgrid));
     vklVolumeVdb = vklOpenVdbFloatGrid->createVolume(VKL_FILTER_TRILINEAR);
+    vklCommit(vklVolumeVdb);
     vklSampler = vklNewSampler(vklVolumeVdb);
+    vklCommit(vklSampler);
 #  endif
 #  ifdef WITH_NANOVDB
     nanogrid = nanovdb::openToNanoVDB(*openvdb::gridConstPtrCast<openvdb::FloatGrid>(grid));
@@ -172,19 +174,10 @@ bool VDBImageLoader::load_metadata(ImageMetaData &metadata)
                                transform_scale(dim.x(), dim.y(), dim.z());
 #  endif
 
-#  ifdef WITH_OPENVKL
-  //TODO: OpenVKL expects coords to be in range 0 - dimension, how to transform into range?
-  // std::cout << " bbox.min: " << bbox.min() << std::endl;
-  // std::cout << " bbox.max: " << bbox.max() << std::endl;
-  openvdb::Coord min = bbox.min();
-  texture_to_index = transform_translate(min.x(), min.y(), min.z()) *
-                               transform_scale(dim.x(), dim.y(), dim.z());
-  // texture_to_index = transform_identity();
-#endif
   metadata.transform_3d = transform_inverse(index_to_object * texture_to_index);
   metadata.use_transform_3d = true;
 #  ifdef WITH_OPENVKL
-  //metadata.use_transform_3d = false;
+  metadata.use_transform_3d = false;
 #endif
 
   return true;
